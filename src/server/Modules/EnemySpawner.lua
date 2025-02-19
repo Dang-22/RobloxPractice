@@ -15,7 +15,6 @@ function EnemySpawner.new(config)
     self.enemiesPerWave = self.config.enemiesPerWave or 5
     self.waveInterval = self.config.waveInterval or 10
     self.enemyTemplate = self.config.enemyTemplate
-    self.waypoints = self.config.waypoints or {}
     return self
 end
 
@@ -25,20 +24,34 @@ function EnemySpawner:SpawnWave(waveNumber)
     for i = 1, self.enemiesPerWave do
         local spawnPoint = self.spawnPoints[((i - 1) % #self.spawnPoints) + 1]
         if spawnPoint then
+            -- Clone the enemy and spawn it at the spawn point.
             local enemyClone = self.enemyTemplate:Clone()
             enemyClone.Parent = workspace
             enemyClone:MoveTo(spawnPoint.Position)
             
-            -- Set PrimaryPart if not already set (assumes a "HumanoidRootPart" exists).
+            -- Ensure the enemy model has its PrimaryPart set.
             if not enemyClone.PrimaryPart and enemyClone:FindFirstChild("HumanoidRootPart") then
                 enemyClone.PrimaryPart = enemyClone.HumanoidRootPart
             end
 
-            -- Start the enemy's AI using the EnemyAI module.
+            -- Gather patrol waypoints from the spawn point's PatrolPoints folder.
+            local patrolPoints = {}
+            local patrolFolder = spawnPoint:FindFirstChild("PatrolPoints")
+            if patrolFolder then
+                for _, point in ipairs(patrolFolder:GetChildren()) do
+                    if point:IsA("BasePart") then
+                        table.insert(patrolPoints, point.Position)
+                    end
+                end
+            else
+                warn("No PatrolPoints folder found for spawn point:", spawnPoint.Name)
+            end
+
+            -- Start the enemy's AI with these patrol points.
             local EnemyAI = require(game.ServerScriptService.Server.Modules.EnemyAI)
             EnemyAI.StartAI(enemyClone, {
                 detectionRadius = 20,
-                waypoints = self.waypoints
+                waypoints = patrolPoints
             })
         end
     end
